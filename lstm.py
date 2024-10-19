@@ -6,10 +6,13 @@ import torch.nn as nn
 from copy import deepcopy
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
-from torch.utils.data import Dataset 
+from torch.utils.data import Dataset, DataLoader
 
 #   Device
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+#   Hyperz
+batchSize = 16
 
 #   Data
 data = pd.read_csv('./AMZN.csv')
@@ -58,7 +61,7 @@ xTest = torch.tensor(xTest).float()
 yTrain = torch.tensor(yTrain).float()
 yTest = torch.tensor(yTest).float()
 
-#   Dataset
+#   Dataset & loader
 class timeSeriesDataset(Dataset):
     def __init__(self, X, y) -> None:
         self.X = X
@@ -72,3 +75,30 @@ class timeSeriesDataset(Dataset):
 
 trainSet = timeSeriesDataset(xTrain, yTrain)
 testSet = timeSeriesDataset(xTest, yTest)
+trainLoader = DataLoader(trainSet, batchSize, True)
+testLoader = DataLoader(testSet, batchSize, True)
+
+#   Batching!
+for _, batch in enumerate(trainLoader):
+    xBatch, yBatch = batch[0].to(device), batch[1].to(device)
+
+#   Model
+class LSTM(nn.Module):
+    def __init__(self, inputSize: int, hiddenSize: int, nStackedLayers: int) -> None:
+        super().__init__()
+        self.inputSize = inputSize 
+        self.hiddenSize = hiddenSize
+        self.nStackedLayers = nStackedLayers 
+        self.lstm = nn.LSTM(inputSize, hiddenSize, nStackedLayers, batch_first = True)
+
+    def forward(self, X) -> None:
+        batchSize = X.size(0)
+        h0 = torch.zeros(self.nStackedLayers, batchSize, self.hiddenSize).to(device)
+        c0 = torch.zeros(self.nStackedLayers, batchSize, self.hiddenSize).to(device)
+        out, _ = self.lstm(X, (h0, c0))
+        out = self.fc(out[:, -1, :])
+        return out
+
+model = LSTM(1, 4, 1)
+model.to(device)
+print(model)
