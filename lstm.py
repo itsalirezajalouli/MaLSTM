@@ -151,19 +151,39 @@ for epoch in range(numEpochs):
     validOneEpoch()
 
 #   Reverse convert
+with torch.no_grad():
+    predicted = model(xTrain.to(device)).to('cpu').numpy()
 trainPreds = predicted.flatten()
 dummies = np.zeros((xTrain.shape[0], hist + 1))
 dummies[:, 0] = trainPreds 
 dummies = scaler.inverse_transform(dummies)
 trainPreds = deepcopy(dummies[:, 0])
-print(trainPreds)
+
+dummies = np.zeros((xTrain.shape[0], hist + 1))
+#   Ground truth
+dummies[:, 0] = yTrain.flatten()
+dummies = scaler.inverse_transform(dummies)
+newyTrain = deepcopy(dummies[:, 0])
+
+testPreds = model(xTest.to(device)).detach().cpu().numpy().flatten()
+dummies = np.zeros((xTest.shape[0], hist + 1))
+dummies[:, 0] = testPreds 
+dummies = scaler.inverse_transform(dummies)
+testPreds = deepcopy(dummies[:, 0])
+
+#   Ground truth
+dummies = np.zeros((xTest.shape[0], hist + 1))
+dummies[:, 0] = yTest.flatten()
+dummies = scaler.inverse_transform(dummies)
+newyTest = deepcopy(dummies[:, 0])
 
 #   Plotting
-with torch.no_grad():
-    predicted = model(xTrain.to(device)).to('cpu').numpy()
-plt.plot(yTrain, label = 'Actual Close')
-plt.plot(predicted, label = 'Predicted Close')
+# plt.plot(newyTrain, label = 'Actual Train Close')
+# plt.plot(trainPreds, label = 'Train Predicted Close')
+plt.plot(newyTest, label = 'Actual Test Close')
+plt.plot(testPreds, label = 'Test Predicted Close')
 plt.xlabel('Day')
 plt.ylabel('Close')
 plt.legend()
 plt.show()
+
