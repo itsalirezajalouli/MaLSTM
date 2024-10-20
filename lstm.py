@@ -13,6 +13,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 #   Hyperz
 batchSize = 16
+learningRate = 1e-3
+numEpochs = 10
 
 #   Data
 data = pd.read_csv('./AMZN.csv')
@@ -86,10 +88,10 @@ for _, batch in enumerate(trainLoader):
 class LSTM(nn.Module):
     def __init__(self, inputSize: int, hiddenSize: int, nStackedLayers: int) -> None:
         super().__init__()
-        self.inputSize = inputSize 
         self.hiddenSize = hiddenSize
         self.nStackedLayers = nStackedLayers 
         self.lstm = nn.LSTM(inputSize, hiddenSize, nStackedLayers, batch_first = True)
+        self.fc = nn.Linear(hiddenSize, 1)
 
     def forward(self, X) -> None:
         batchSize = X.size(0)
@@ -101,4 +103,34 @@ class LSTM(nn.Module):
 
 model = LSTM(1, 4, 1)
 model.to(device)
-print(model)
+
+#   Optim & loss
+lossFunc = nn.MSELoss()
+optim = torch.optim.Adam(model.parameters(), lr = learningRate)
+
+#   Loops
+
+def trainOneEpoch():
+    model.train()
+    runningLoss = 0.0
+    print(f'Epoch: {epoch + 1}')
+    for batchIdx, batch in enumerate(trainLoader):
+        xBatch, yBatch = batch[0].to(device), batch[1].to(device)
+
+        output = model(xBatch)
+        loss = lossFunc(output, yBatch)
+        runningLoss += loss.item()
+
+        optim.zero_grad()
+        loss.backward()
+        optim.step()                        #   take a slight step toward the gradient
+
+        if batchIdx % 100 == 99:
+            avgBatchLoss = runningLoss / 100
+            print('Batch {}, Loss: {:.3f}', batchIdx + 1, avgBatchLoss)
+            runningLoss = 0.0
+        print()
+
+for epoch in range(numEpochs):
+    trainOneEpoch()
+    validOneEpoch()
