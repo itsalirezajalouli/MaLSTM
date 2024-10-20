@@ -105,11 +105,10 @@ model = LSTM(1, 4, 1)
 model.to(device)
 
 #   Optim & loss
-lossFunc = nn.MSELoss()
+lossFn = nn.MSELoss()
 optim = torch.optim.Adam(model.parameters(), lr = learningRate)
 
-#   Loops
-
+#   Train loop
 def trainOneEpoch():
     model.train()
     runningLoss = 0.0
@@ -118,19 +117,53 @@ def trainOneEpoch():
         xBatch, yBatch = batch[0].to(device), batch[1].to(device)
 
         output = model(xBatch)
-        loss = lossFunc(output, yBatch)
+        loss = lossFn(output, yBatch)
         runningLoss += loss.item()
 
         optim.zero_grad()
         loss.backward()
-        optim.step()                        #   take a slight step toward the gradient
+        optim.step()                            #   take a slight step toward the gradient
 
         if batchIdx % 100 == 99:
             avgBatchLoss = runningLoss / 100
-            print('Batch {}, Loss: {:.3f}', batchIdx + 1, avgBatchLoss)
+            print(f'Batch {batchIdx + 1}, Batch Loss: {avgBatchLoss:.3f}')
             runningLoss = 0.0
-        print()
 
+#   Test loop
+def validOneEpoch():
+    model.eval()
+    runningLoss = 0.0
+    for _, batch in enumerate(testLoader):
+        xBatch, yBatch = batch[0].to(device), batch[1].to(device)
+
+        output = model(xBatch)
+        loss = lossFn(output, yBatch)
+        runningLoss += loss.item()
+
+    avgBatchLoss = runningLoss / len(testLoader)
+    print(f'Val Loss: {avgBatchLoss:.3f}')
+
+    print('\u2589' * 80, '\n')
+
+#   Main loop
 for epoch in range(numEpochs):
     trainOneEpoch()
     validOneEpoch()
+
+#   Reverse convert
+trainPreds = predicted.flatten()
+dummies = np.zeros((xTrain.shape[0], hist + 1))
+dummies[:, 0] = trainPreds 
+dummies = scaler.inverse_transform(dummies)
+trainPreds = deepcopy(dummies[:, 0])
+print(trainPreds)
+
+#   Plotting
+with torch.no_grad():
+    predicted = model(xTrain.to(device)).to('cpu').numpy()
+plt.plot(yTrain, label = 'Actual Close')
+plt.plot(predicted, label = 'Predicted Close')
+plt.xlabel('Day')
+plt.ylabel('Close')
+plt.legend()
+plt.show()
